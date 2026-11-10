@@ -1,0 +1,5 @@
+# Recommended environment for the notebooks (set 2026-11-10). Use Python 3.12.
+numpy==2.5.4
+scipy==1.18.1
+matplotlib==3.11.2
+jupyterlab==4.6.6
