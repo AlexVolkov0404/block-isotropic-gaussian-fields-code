@@ -1,6 +1,6 @@
-# Block-Isotropic Gaussian Fields: Numerical Notebooks
+# Block-Isotropic Gaussian Fields: Numerical Code
 
-Companion code for the manuscript *On the Local Structure and Approximation Stability of Block Isotropic Gaussian Fields*. The notebooks evaluate bounds for the quadratic Taylor approximation about matched inputs and assess their coverage by simulation.
+Companion code for the manuscript *On the Local Structure and Approximation Stability of Block Isotropic Gaussian Fields*. It evaluates bounds for the quadratic Taylor approximation about matched inputs and assesses their coverage by simulation.
 
 | Notebook | Manuscript output | What it computes |
 | --- | --- | --- |
@@ -8,7 +8,31 @@ Companion code for the manuscript *On the Local Structure and Approximation Stab
 | [02_probability_bounds_and_radii.ipynb](02_probability_bounds_and_radii.ipynb) | Figures 4 and 5 | Lower bounds on the probability that the error stays within a given tolerance, jointly over the field and independent Gaussian inputs, and the radii certified by those bounds. |
 | [03_fixed_input_calibration.ipynb](03_fixed_input_calibration.ipynb) | Table 1 and Figure 6 | Monte Carlo coverage for the refined pointwise and simultaneous thresholds, with a comparison of theoretical thresholds and empirical 95th percentiles. |
 
-## Run the notebooks
+## Layout
+
+```
+bigf/                 shared Python modules
+  profiles.py         covariance profiles h and their derivatives
+  bounds.py           variance envelope, thresholds, and probability bounds
+  inputs.py           Gaussian input model for the joint bounds
+  covariance.py       covariances of the field, its Taylor approximation, and the error
+  sampling.py         point sets and sampling of approximation errors
+  calibration.py      coverage statistics
+  fixed_input.py      the fixed-input Monte Carlo experiment
+  plotting.py         figure styles and saving
+  paths.py            output locations
+scripts/
+  run_fixed_input.py  runs the Monte Carlo experiment behind Table 1 and Figure 6
+  sync_to_paper.sh    copies the manuscript's figures into the paper folder
+tests/                tests of the modules and of the committed results
+01–03 notebooks       build the figures and Table 1
+figs/                 figures and the data plotted in Figures 4 and 5
+results/              Monte Carlo results, Table 1, and the data for Figure 6
+```
+
+The notebooks hold the settings and the plotting code for each figure. The formulas and the simulation are in `bigf/`, so every notebook and script uses the same implementation. A new experiment adds a module in `bigf/`, a script in `scripts/`, a folder in `results/`, and a notebook.
+
+## Run the code
 
 Use Python 3.12 (see [Computing environment](#computing-environment)). On macOS or Linux, run:
 
@@ -21,11 +45,43 @@ python -m pip install -r requirements.txt
 jupyter lab
 ```
 
-Open any notebook and run its cells from top to bottom. Start Jupyter in the repository root so the relative output paths resolve there.
+Start Jupyter in the repository root, open any notebook, and run its cells from top to bottom. To run all three from the command line instead:
 
-For Notebook 03, set `RUN_NEW_SIMULATION = True` in the cell that selects the data source to run the experiment from a fresh clone. It uses seed `2026102302` and 10,000 independent field realizations for each of 60 scenarios: four covariance profiles, five block dimensions, and three radii. Coverage is evaluated at nominal levels of 80%, 90%, 95%, 99%, and 99.9%. The simultaneous comparison uses the maximum absolute error over 128 fixed input pairs per field realization.
+```bash
+jupyter nbconvert --to notebook --execute --inplace 0*.ipynb
+```
 
-The values in the manuscript's Table 1 and Figure 6 come from the run saved in `results/fixed_input/calibration_rerun.json` (seed `2026102302`). To rebuild Table 1 and the Figure 6 data from these records without rerunning the simulation, copy that file to `data/CALIBRATION_DATA.json` and set `RUN_NEW_SIMULATION = False`. A new run follows the same design and seed but can give slightly different Monte Carlo values in a different numerical environment, for example with a different NumPy, SciPy, or BLAS build.
+Notebooks 01 and 02 compute everything they plot. Notebook 03 reads the Monte Carlo results saved in `results/fixed_input/`.
+
+## Monte Carlo experiment
+
+```bash
+python scripts/run_fixed_input.py
+```
+
+This samples 10,000 independent field realizations for each of 60 scenarios: four covariance profiles, five block dimensions, and three radii. It uses seed `2026102302` and takes a few seconds. Coverage is evaluated at nominal levels of 80%, 90%, 95%, 99%, and 99.9%. The simultaneous comparison uses the maximum absolute error over 128 fixed input pairs per field realization.
+
+The script writes these files to `results/fixed_input/`:
+
+- `raw/`: the fixed input pairs and, for each scenario, the sampled errors at the fixed pair and the maxima over the first 32, 64, and 128 pairs.
+- `calibration_records.json`: coverage, threshold, and empirical quantile for each scenario, level, and threshold.
+- `diagnostics.json`: checks of the sampling construction.
+- `run_info.json`: the settings and the Python, NumPy, and SciPy versions of the run.
+
+The values in the manuscript's Table 1 and Figure 6 come from the committed files. Running the script again overwrites them. A new run uses the same design and seed, but it can give slightly different Monte Carlo values in a different numerical environment, for example with a different NumPy, SciPy, or BLAS build. To rebuild `calibration_records.json` from the committed errors without sampling, run:
+
+```bash
+python scripts/run_fixed_input.py --summarize
+```
+
+## Tests
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m pytest
+```
+
+The tests check the profiles, bounds, and sampling against closed forms and against each other. `tests/test_consistency.py` also recomputes the committed files in `figs/` and `results/`.
 
 ## Computing environment
 
@@ -41,9 +97,9 @@ The values in the manuscript's Table 1 and Figure 6 come from the run saved in `
 
 Python 3.12 receives source-only security releases, so python.org no longer offers macOS or Windows installers for its latest versions. Install it with a tool such as [uv](https://docs.astral.sh/uv/) (`uv python install 3.12`), Homebrew (`brew install python@3.12`), or pyenv.
 
-The Monte Carlo records behind the manuscript's Table 1 and Figure 6 (`results/fixed_input/calibration_rerun.json`) and the committed Figures 2–6 were generated on 2026-11-08 with Python 3.13.5 and Matplotlib 3.10.6. Rebuilding Table 1 and the Figure 6 data from those records gives the same files in the recommended environment.
+The committed figures and results were generated in this environment. `results/fixed_input/run_info.json` records the versions used for the Monte Carlo run.
 
 ## Generated files
 
-- `figs/`: Figures 2–6 in PDF and PNG format, plus the data for Figures 4 and 5 in CSV format.
-- `results/fixed_input/`: Table 1 in LaTeX and CSV format and the data for Figure 6. A new simulation also saves calibration records, diagnostics, and the sampled fixed-pair errors and finite-set maxima used for the comparisons.
+- `figs/`: Figures 2–6 in PDF and PNG format, plus the data for Figures 4 and 5 in CSV format. The PDFs carry no creation date, so an unchanged plot gives an unchanged file.
+- `results/fixed_input/`: the Monte Carlo results listed above, Table 1 in LaTeX and CSV format, and the data for Figure 6.
