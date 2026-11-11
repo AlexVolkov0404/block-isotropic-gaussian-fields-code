@@ -8,9 +8,9 @@
 # The paper folder is taken from the PAPER_DIR argument, then the PAPER_DIR
 # environment variable, then ../paper next to this repo.
 #
-# PDFs saved by Matplotlib embed a creation date, so a re-run shows as
-# "differs" even when the plot is unchanged. Save with
-# metadata={"CreationDate": None} to make identical plots byte-identical.
+# The figures are saved without a creation date (bigf.plotting.save_figure),
+# so "differs" means that the plot itself changed. Run this from a clean,
+# merged main so that the reported commit identifies the figures.
 set -euo pipefail
 
 # Figures included by the manuscript (cas-sc-template.tex).

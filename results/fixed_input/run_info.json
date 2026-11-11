@@ -1,0 +1,43 @@
+{
+  "experiment": "fixed_input",
+  "config": {
+    "seed": 2026102302,
+    "profiles": [
+      "squared_exponential",
+      "rational_quadratic",
+      "matern_7_2",
+      "matern_9_2"
+    ],
+    "dimensions": [
+      2,
+      8,
+      32,
+      128,
+      256
+    ],
+    "radii": [
+      0.05,
+      0.15,
+      0.5
+    ],
+    "point_counts": [
+      32,
+      64,
+      128
+    ],
+    "n_fields": 10000,
+    "confidence_levels": [
+      0.8,
+      0.9,
+      0.95,
+      0.99,
+      0.999
+    ]
+  },
+  "environment": {
+    "python": "3.12.16",
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "platform": "Darwin arm64"
+  }
+}
