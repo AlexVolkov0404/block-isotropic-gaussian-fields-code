@@ -5,6 +5,11 @@ Usage:
     python scripts/run_fixed_input.py               sample new fields
     python scripts/run_fixed_input.py --summarize   rebuild the records from saved errors
 
+Options:
+    --results-dir DIR                write to DIR instead of results/fixed_input/
+    --reference-pair antidiagonal    use the earlier reference pair (R e_1, -R e_1)
+                                     in every scenario, for checking against old results
+
 Results go to results/fixed_input/. Notebook 03 reads them to build Table 1 and
 Figure 6. The same seed can give slightly different Monte Carlo values in a
 different numerical environment, so run_info.json records the package versions.
@@ -28,10 +33,18 @@ def main():
         "--summarize", action="store_true",
         help="rebuild calibration_records.json from results/fixed_input/raw/",
     )
+    parser.add_argument(
+        "--results-dir", type=Path, default=fixed_input.DEFAULT_RESULTS_DIR,
+        help="output directory (default: results/fixed_input/)",
+    )
+    parser.add_argument(
+        "--reference-pair", choices=fixed_input.REFERENCE_PAIRS, default="ball_maximizer",
+        help="pair for the pointwise error (default: ball_maximizer)",
+    )
     args = parser.parse_args()
 
-    config = fixed_input.FixedInputConfig()
-    results_dir = fixed_input.DEFAULT_RESULTS_DIR
+    config = fixed_input.FixedInputConfig(reference_pair=args.reference_pair)
+    results_dir = args.results_dir.resolve()
 
     if args.summarize:
         records = fixed_input.summarize(config, results_dir)
@@ -41,7 +54,8 @@ def main():
         return
 
     print(f"Fixed-input calibration: {config.n_scenarios} scenarios, "
-          f"{config.n_fields:,} fields per scenario, seed {config.seed}.")
+          f"{config.n_fields:,} fields per scenario, seed {config.seed}, "
+          f"reference pair {config.reference_pair}.")
     start = time.perf_counter()
     records = fixed_input.run(
         config, results_dir,

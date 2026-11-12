@@ -32,7 +32,8 @@
       0.95,
       0.99,
       0.999
-    ]
+    ],
+    "reference_pair": "ball_maximizer"
   },
   "environment": {
     "python": "3.12.16",

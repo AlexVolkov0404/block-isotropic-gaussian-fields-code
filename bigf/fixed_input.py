@@ -1,10 +1,19 @@
 """Fixed-input Monte Carlo experiment (Table 1 and Figure 6 of the manuscript).
 
 For each profile, block dimension D and radius R, the experiment samples
-independent fields and records the absolute error at the fixed pair
-(R e_1, -R e_1) and the maximum absolute error over a fixed set of input pairs.
-These are compared with the refined pointwise threshold and the simultaneous
-threshold at several field-confidence levels.
+independent fields and records the absolute error at a reference pair and the
+maximum absolute error over a fixed set of 128 input pairs. These are compared
+with the refined pointwise threshold and the simultaneous threshold at several
+field-confidence levels.
+
+The reference pair is x*(h, R), a pair in B_R x B_R at which the error standard
+deviation is maximal (reference_pair="ball_maximizer"), so that the pointwise
+threshold is checked where it is tightest. On the manuscript grid x* is the
+antidiagonal pair (R e_1, -R e_1), the first point of the fixed set, except for
+the rational quadratic and Matern profiles at R = 0.5; there x* is appended to
+the set as a 129th point, and the maxima still use only the 128 fixed points.
+reference_pair="antidiagonal" reproduces the earlier design, which always used
+(R e_1, -R e_1).
 
 Files written under the results directory:
 
@@ -32,10 +41,17 @@ from .calibration import coverage_summary
 from .covariance import error_variance
 from .paths import RESULTS_DIR
 from .profiles import get_profile
-from .sampling import antidiagonal_point, sample_errors, unit_pair_points
+from .sampling import (
+    antidiagonal_point,
+    ball_maximizing_pair,
+    pair_angle_deg,
+    sample_errors,
+    unit_pair_points,
+)
 
 DEFAULT_RESULTS_DIR = RESULTS_DIR / "fixed_input"
 SCHEMES = ("pointwise_refined", "simultaneous")
+REFERENCE_PAIRS = ("ball_maximizer", "antidiagonal")
 
 
 @dataclass(frozen=True)
@@ -51,6 +67,11 @@ class FixedInputConfig:
     point_counts: tuple[int, ...] = (32, 64, 128)
     n_fields: int = 10_000
     confidence_levels: tuple[float, ...] = (0.80, 0.90, 0.95, 0.99, 0.999)
+    reference_pair: str = "ball_maximizer"
+
+    def __post_init__(self):
+        if self.reference_pair not in REFERENCE_PAIRS:
+            raise ValueError(f"reference_pair must be one of {REFERENCE_PAIRS}.")
 
     @property
     def n_scenarios(self):
@@ -59,8 +80,12 @@ class FixedInputConfig:
     @property
     def events(self):
         """Describe the error that each threshold is compared with."""
+        pointwise = {
+            "ball_maximizer": "absolute_error_at_variance_maximizing_pair",
+            "antidiagonal": "absolute_error_at_fixed_reference_point",
+        }[self.reference_pair]
         return {
-            "pointwise_refined": "absolute_error_at_fixed_reference_point",
+            "pointwise_refined": pointwise,
             "simultaneous": f"maximum_on_{max(self.point_counts)}_fixed_points",
         }
 
@@ -84,6 +109,50 @@ def unit_points_path(results_dir, dimension):
     return Path(results_dir) / "raw" / f"unit_points_D{dimension}.npy"
 
 
+def reference_pair(config, profile, dimension, radius):
+    """Return the reference pair of one scenario and a dictionary describing it.
+
+    The dictionary holds the fields added to the pointwise records:
+    reference_pair is "antidiagonal" when the pair is (R e_1, -R e_1), the first
+    point of the fixed set, and "ball_maximizer" when it is a separate pair.
+    """
+    maximizer, info = ball_maximizing_pair(dimension, profile, radius)
+    if config.reference_pair == "antidiagonal" or info["is_antidiagonal"]:
+        pair = antidiagonal_point(dimension, radius)
+        name = "antidiagonal"
+    else:
+        pair = maximizer
+        name = "ball_maximizer"
+    variance = float(error_variance(pair, profile)[0])
+    sup_sd = math.sqrt(info["max_variance"])
+    d = pair.shape[1] // 2
+    difference = float(np.sum((pair[0, :d] - pair[0, d:]) ** 2))
+    total = float(np.sum((pair[0, :d] + pair[0, d:]) ** 2))
+    description = {
+        "reference_pair": name,
+        "reference_pair_is_variance_maximizer": bool(
+            name == "ball_maximizer" or info["is_antidiagonal"]
+        ),
+        "reference_pair_d_over_4r2": difference / (4.0 * radius**2),
+        "reference_pair_s_over_4r2": total / (4.0 * radius**2),
+        "reference_pair_angle_deg": pair_angle_deg(pair),
+        "reference_sd": math.sqrt(variance),
+        "sup_sd": sup_sd,
+        "antidiagonal_sd": math.sqrt(info["antidiagonal_variance"]),
+        "refined_sd_over_sup_sd": float(bounds.pointwise_sd(profile, radius)) / sup_sd,
+    }
+    return pair, description
+
+
+def scenario_points(config, profile, dimension, radius, unit_points):
+    """Return the point set of one scenario, the reference column, its description and the pair."""
+    pair, description = reference_pair(config, profile, dimension, radius)
+    points = radius * unit_points
+    if description["reference_pair"] == "antidiagonal":
+        return points, 0, description, pair
+    return np.vstack([points, pair]), len(points), description, pair
+
+
 def thresholds(profile, radius, dimension, p):
     """Return the absolute-error thresholds at field-confidence level p."""
     return {
@@ -94,18 +163,24 @@ def thresholds(profile, radius, dimension, p):
     }
 
 
-def scenario_records(config, profile, dimension, radius, reference_errors, maxima):
+def scenario_records(config, profile, dimension, radius, reference_errors, maxima,
+                     reference=None):
     """Summarize the sampled errors of one scenario at every confidence level.
 
-    reference_errors  signed errors at the pair (R e_1, -R e_1), one per field
-    maxima            maximum absolute error over the first k points of the set,
-                      with one column for each k in config.point_counts
+    reference_errors  signed errors at the reference pair, one per field
+    maxima            maximum absolute error over the first k points of the fixed
+                      set, with one column for each k in config.point_counts
+    reference         the (pair, description) returned by reference_pair
+                      (computed if None)
     """
+    if reference is None:
+        reference = reference_pair(config, profile, dimension, radius)
+    pair, description = reference
     values = {
         "pointwise_refined": np.abs(reference_errors),
         "simultaneous": np.asarray(maxima)[:, -1],
     }
-    variance = float(error_variance(antidiagonal_point(dimension, radius), profile)[0])
+    variance = float(error_variance(pair, profile)[0])
 
     records = []
     for p in config.confidence_levels:
@@ -113,10 +188,12 @@ def scenario_records(config, profile, dimension, radius, reference_errors, maxim
         for scheme in SCHEMES:
             summary = coverage_summary(values[scheme], levels[scheme], p)
             exact_coverage = None
+            pair_fields = dict.fromkeys(description)
             if scheme == "pointwise_refined":
                 exact_coverage = float(
                     erf(summary["threshold"] / math.sqrt(2.0 * variance))
                 )
+                pair_fields = dict(description)
             records.append({
                 "profile": profile.name,
                 "dimension": int(dimension),
@@ -127,6 +204,7 @@ def scenario_records(config, profile, dimension, radius, reference_errors, maxim
                 **summary,
                 "exact_gaussian_fixed_point_coverage": exact_coverage,
                 "measured_continuum_supremum_coverage": False,
+                **pair_fields,
             })
     return records
 
@@ -170,12 +248,16 @@ def run(config=FixedInputConfig(), results_dir=DEFAULT_RESULTS_DIR, progress=Non
                 # independent random inputs and is not used here.
                 field_seed, _ = seed_sequence.spawn(2)
                 field_rng = np.random.default_rng(field_seed)
+                points, column, description, pair = scenario_points(
+                    config, profile, dimension, radius, unit_points
+                )
                 errors, diagnostic = sample_errors(
-                    radius * unit_points, profile, config.n_fields, field_rng
+                    points, profile, config.n_fields, field_rng
                 )
 
+                # The maxima use only the first max(point_counts) fixed points.
                 absolute = np.abs(errors)
-                reference_errors = errors[:, 0]
+                reference_errors = errors[:, column]
                 maxima = np.column_stack([
                     absolute[:, :count].max(axis=1) for count in config.point_counts
                 ])
@@ -186,10 +268,13 @@ def run(config=FixedInputConfig(), results_dir=DEFAULT_RESULTS_DIR, progress=Non
                 )
 
                 records.extend(scenario_records(
-                    config, profile, dimension, radius, reference_errors, maxima
+                    config, profile, dimension, radius, reference_errors, maxima,
+                    (pair, description),
                 ))
                 diagnostics.append(dict(
-                    profile=name, dimension=dimension, radius=radius, **diagnostic
+                    profile=name, dimension=dimension, radius=radius,
+                    point_count=len(points), reference_column=column,
+                    reference_pair=description["reference_pair"], **diagnostic
                 ))
                 if progress is not None:
                     progress(name, dimension, radius)
