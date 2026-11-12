@@ -59,12 +59,14 @@ Notebooks 01 and 02 compute everything they plot. Notebook 03 reads the Monte Ca
 python scripts/run_fixed_input.py
 ```
 
-This samples 10,000 independent field realizations for each of 60 scenarios: four covariance profiles, five block dimensions, and three radii. It uses seed `2026102302` and takes a few seconds. Coverage is evaluated at nominal levels of 80%, 90%, 95%, 99%, and 99.9%. The simultaneous comparison uses the maximum absolute error over 128 fixed input pairs per field realization.
+This samples 10,000 independent field realizations for each of 60 scenarios: four covariance profiles, five block dimensions, and three radii. It uses seed `2026102302` and takes a few seconds. Coverage is evaluated at nominal levels of 80%, 90%, 95%, 99%, and 99.9%. The pointwise comparison uses the absolute error at a reference pair x*(h, R), a pair in the product of two balls of radius R at which the error standard deviation is largest, so the pointwise threshold is checked where it is tightest. It is the antidiagonal pair (R e_1, -R e_1) except for the rational quadratic and Matérn profiles at R = 0.5. The simultaneous comparison uses the maximum absolute error over 128 fixed input pairs per field realization.
+
+`--reference-pair antidiagonal` uses (R e_1, -R e_1) in every scenario, the reference pair of results generated before this option existed, and `--results-dir DIR` writes the results to another folder.
 
 The script writes these files to `results/fixed_input/`:
 
-- `raw/`: the fixed input pairs and, for each scenario, the sampled errors at the fixed pair and the maxima over the first 32, 64, and 128 pairs.
-- `calibration_records.json`: coverage, threshold, and empirical quantile for each scenario, level, and threshold.
+- `raw/`: the fixed input pairs and, for each scenario, the sampled errors at the reference pair and the maxima over the first 32, 64, and 128 pairs.
+- `calibration_records.json`: coverage, threshold, and empirical quantile for each scenario, level, and threshold; the pointwise records also describe the reference pair.
 - `diagnostics.json`: checks of the sampling construction.
 - `run_info.json`: the settings and the Python, NumPy, and SciPy versions of the run.
 

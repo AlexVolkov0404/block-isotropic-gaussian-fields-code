@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 from scipy.linalg import eigh
 
@@ -11,7 +13,14 @@ from .covariance import (
     field_covariance,
     flip,
     joint_field_taylor_covariance,
+    max_error_variance,
 )
+
+# Relative tolerance for treating the antidiagonal pair as the variance maximizer.
+# Rounding in the variance formula reaches about 1e-9 relative at small radii
+# (Matern, R = 0.05); where the maximizer is not antidiagonal on the manuscript
+# grid, the maximal variance exceeds the antidiagonal one by at least 6 percent.
+ANTIDIAGONAL_TOLERANCE = 1e-6
 
 
 def antidiagonal_point(dimension, radius=1.0):
@@ -19,6 +28,52 @@ def antidiagonal_point(dimension, radius=1.0):
     x = np.zeros((1, 2 * dimension))
     x[0, 0], x[0, dimension] = radius, -radius
     return x
+
+
+def ball_maximizing_pair(dimension, profile, radius):
+    """Return a pair in B_R x B_R at which the error variance is maximal.
+
+    The result is an array of shape (1, 2 D) and a dictionary describing the pair.
+    If the antidiagonal pair (R e_1, -R e_1) attains the maximum, that array is
+    returned exactly as antidiagonal_point builds it. Otherwise the pair is
+    a = (sqrt(d*) e_1 + sqrt(s*) e_2) / 2, b = (-sqrt(d*) e_1 + sqrt(s*) e_2) / 2,
+    so that |a - b|^2 = d*, |a + b|^2 = s* and |a| = |b| = sqrt((d* + s*) / 4).
+    Requires D >= 2.
+    """
+    if dimension < 2:
+        raise ValueError("The variance-maximizing pair needs D >= 2.")
+    maximum = max_error_variance(profile, radius)
+    antidiagonal = antidiagonal_point(dimension, radius)
+    antidiagonal_variance = float(error_variance(antidiagonal, profile)[0])
+    is_antidiagonal = maximum.variance <= antidiagonal_variance * (1.0 + ANTIDIAGONAL_TOLERANCE)
+
+    if is_antidiagonal:
+        pair = antidiagonal
+        difference, total = 4.0 * radius**2, 0.0
+    else:
+        difference, total = maximum.difference, maximum.total
+        pair = np.zeros((1, 2 * dimension))
+        pair[0, 0], pair[0, 1] = math.sqrt(difference) / 2.0, math.sqrt(total) / 2.0
+        pair[0, dimension], pair[0, dimension + 1] = -pair[0, 0], pair[0, 1]
+
+    info = {
+        "is_antidiagonal": bool(is_antidiagonal),
+        "d_over_4r2": difference / (4.0 * radius**2),
+        "s_over_4r2": total / (4.0 * radius**2),
+        "angle_deg": pair_angle_deg(pair),
+        "variance": float(error_variance(pair, profile)[0]),
+        "max_variance": float(maximum.variance),
+        "antidiagonal_variance": antidiagonal_variance,
+    }
+    return pair, info
+
+
+def pair_angle_deg(x):
+    """Return the angle in degrees between the two blocks of a single pair x."""
+    d = x.shape[-1] // 2
+    a, b = np.asarray(x).reshape(-1)[:d], np.asarray(x).reshape(-1)[d:]
+    cosine = float(a @ b / (np.linalg.norm(a) * np.linalg.norm(b)))
+    return math.degrees(math.acos(min(max(cosine, -1.0), 1.0)))
 
 
 def unit_pair_points(dimension, count, rng):

@@ -1,6 +1,7 @@
 """The fixed-input experiment on a small configuration."""
 
 import json
+import math
 
 import numpy as np
 import pytest
@@ -45,6 +46,12 @@ def test_default_config_is_the_manuscript_design():
     assert config.n_fields == 10_000
     assert len(config.record_keys()) == 600
     assert config.events["simultaneous"] == "maximum_on_128_fixed_points"
+    assert config.reference_pair == "ball_maximizer"
+    assert config.events["pointwise_refined"] == "absolute_error_at_variance_maximizing_pair"
+    old = fixed_input.FixedInputConfig(reference_pair="antidiagonal")
+    assert old.events["pointwise_refined"] == "absolute_error_at_fixed_reference_point"
+    with pytest.raises(ValueError):
+        fixed_input.FixedInputConfig(reference_pair="other")
 
 
 def test_thresholds_follow_the_bounds():
@@ -106,3 +113,83 @@ def test_load_records_rejects_other_settings(tmp_path):
         fixed_input.load_records(fixed_input.FixedInputConfig(), tmp_path)
     with pytest.raises(FileNotFoundError):
         fixed_input.load_records(SMALL, tmp_path / "missing")
+
+
+# R = 0.5 makes the variance-maximizing pair of the Matérn 7/2 profile non-antidiagonal.
+MIXED = fixed_input.FixedInputConfig(
+    seed=3, profiles=("squared_exponential", "matern_7_2"), dimensions=(2, 8),
+    radii=(0.15, 0.5), point_counts=(8, 16), n_fields=300, confidence_levels=(0.9,),
+)
+
+
+def test_point_sets_and_reference_columns():
+    rng = np.random.default_rng(0)
+    unit_points = fixed_input.unit_pair_points(8, 16, rng)
+    for name, radius, antidiagonal in (
+        ("squared_exponential", 0.5, True),
+        ("matern_7_2", 0.15, True),
+        ("matern_7_2", 0.5, False),
+    ):
+        profile = profiles.get_profile(name)
+        points, column, description, _ = fixed_input.scenario_points(
+            MIXED, profile, 8, radius, unit_points
+        )
+        assert np.array_equal(points[:16], radius * unit_points)
+        if antidiagonal:
+            assert points.shape == (16, 16) and column == 0
+            assert description["reference_pair"] == "antidiagonal"
+        else:
+            assert points.shape == (17, 16) and column == 16
+            assert description["reference_pair"] == "ball_maximizer"
+            assert description["reference_sd"] > description["antidiagonal_sd"] * 1.03
+        assert description["reference_pair_is_variance_maximizer"]
+        np.testing.assert_allclose(description["reference_sd"], description["sup_sd"], rtol=1e-9)
+        assert description["refined_sd_over_sup_sd"] >= 1.0
+
+        # The earlier design always uses the first fixed point.
+        old = fixed_input.FixedInputConfig(reference_pair="antidiagonal")
+        points, column, description, _ = fixed_input.scenario_points(
+            old, profile, 8, radius, unit_points
+        )
+        assert np.array_equal(points, radius * unit_points) and column == 0
+        assert description["reference_pair_is_variance_maximizer"] == antidiagonal
+
+
+def test_run_with_appended_maximizer(tmp_path):
+    records = fixed_input.run(MIXED, tmp_path)
+    assert fixed_input.summarize(MIXED, tmp_path) == records
+    diagnostics = json.loads((tmp_path / "diagnostics.json").read_text())
+    counts = {(d["profile"], d["dimension"], d["radius"]): d["point_count"] for d in diagnostics}
+    for dimension in MIXED.dimensions:
+        assert counts["squared_exponential", dimension, 0.5] == 16
+        assert counts["matern_7_2", dimension, 0.15] == 16
+        assert counts["matern_7_2", dimension, 0.5] == 17
+
+    # The maxima use only the fixed points: they agree with the antidiagonal design.
+    old = fixed_input.FixedInputConfig(**{**MIXED.__dict__, "reference_pair": "antidiagonal"})
+    fixed_input.run(old, tmp_path / "old")
+    for dimension in MIXED.dimensions:
+        for name in MIXED.profiles:
+            for radius in MIXED.radii:
+                with np.load(fixed_input.raw_path(tmp_path, name, dimension, radius)) as new_raw, \
+                        np.load(fixed_input.raw_path(tmp_path / "old", name, dimension, radius)) as old_raw:
+                    same = np.array_equal(new_raw["fixed_reference_point_errors"],
+                                          old_raw["fixed_reference_point_errors"])
+                    if (name, radius) == ("matern_7_2", 0.5):
+                        assert not same
+                        # Same law of the fixed-point maxima, different draws.
+                        assert new_raw["finite_set_maxima"].shape == old_raw["finite_set_maxima"].shape
+                    else:
+                        assert same
+                        assert np.array_equal(new_raw["finite_set_maxima"],
+                                              old_raw["finite_set_maxima"])
+
+    for row in records:
+        if row["scheme"] == "pointwise_refined":
+            # The exact coverage uses the variance at the reference pair x*.
+            expected = math.erf(row["threshold"] / (math.sqrt(2.0) * row["reference_sd"]))
+            np.testing.assert_allclose(row["exact_gaussian_fixed_point_coverage"], expected)
+            assert row["exact_gaussian_fixed_point_coverage"] >= row["p"]
+            assert row["reference_pair_is_variance_maximizer"]
+        else:
+            assert row["reference_pair"] is None
