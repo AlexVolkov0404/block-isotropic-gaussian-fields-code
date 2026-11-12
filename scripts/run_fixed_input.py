@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Run the fixed-input Monte Carlo experiment behind Table 1 and Figure 6.
+"""Run the fixed-input Monte Carlo experiment behind Table 1 and Figure 5.
 
 Usage:
     python scripts/run_fixed_input.py               sample new fields
     python scripts/run_fixed_input.py --summarize   rebuild the records from saved errors
 
 Results go to results/fixed_input/. Notebook 03 reads them to build Table 1 and
-Figure 6. The same seed can give slightly different Monte Carlo values in a
+Figure 5. The same seed can give slightly different Monte Carlo values in a
 different numerical environment, so run_info.json records the package versions.
 """
 

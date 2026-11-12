@@ -15,8 +15,7 @@ set -euo pipefail
 
 # Figures included by the manuscript (cas-sc-template.tex).
 FIGURES="
-variance_envelope_se_rq.pdf
-variance_envelope_matern.pdf
+variance_envelope.pdf
 probability_bounds_combined.pdf
 radius_dimension.pdf
 calibration_p95.pdf
