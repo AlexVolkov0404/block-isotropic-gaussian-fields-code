@@ -6,7 +6,7 @@ from pathlib import Path
 
 from .paths import FIG_DIR
 
-# Figures 2-4 (variance envelopes, probability bounds, admissible radii).
+# Figures 3-5 (variance envelopes, probability bounds, admissible radii).
 SERIF_STYLE = {
     "font.family": "serif",
     "font.serif": ["DejaVu Serif"],
@@ -24,7 +24,7 @@ SERIF_STYLE = {
     "savefig.facecolor": "white",
 }
 
-# Figure 5 (fixed-input calibration).
+# Figure 6 (fixed-input calibration).
 SANS_STYLE = {
     "font.family": "DejaVu Sans",
     "font.size": 9,

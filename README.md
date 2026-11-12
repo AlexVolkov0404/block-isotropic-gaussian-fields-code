@@ -4,9 +4,9 @@ Companion code for the manuscript *On the Local Structure and Approximation Stab
 
 | Notebook | Manuscript output | What it computes |
 | --- | --- | --- |
-| [01_variance_envelopes.ipynb](01_variance_envelopes.ipynb) | Figure 2 | Pointwise variance envelopes for squared exponential, rational quadratic, and Matérn covariance profiles. |
-| [02_probability_bounds_and_radii.ipynb](02_probability_bounds_and_radii.ipynb) | Figures 3 and 4 | Lower bounds on the probability that the error stays within a given tolerance, jointly over the field and independent Gaussian inputs, and the radii certified by those bounds. |
-| [03_fixed_input_calibration.ipynb](03_fixed_input_calibration.ipynb) | Table 1 and Figure 5 | Monte Carlo coverage for the refined pointwise and simultaneous thresholds, with a comparison of theoretical thresholds and empirical 95th percentiles. |
+| [01_variance_envelopes.ipynb](01_variance_envelopes.ipynb) | Figure 3 | Pointwise variance envelopes for squared exponential, rational quadratic, and Matérn covariance profiles. |
+| [02_probability_bounds_and_radii.ipynb](02_probability_bounds_and_radii.ipynb) | Figures 4 and 5 | Lower bounds on the probability that the error stays within a given tolerance, jointly over the field and independent Gaussian inputs, and the radii certified by those bounds. |
+| [03_fixed_input_calibration.ipynb](03_fixed_input_calibration.ipynb) | Table 1 and Figure 6 | Monte Carlo coverage for the refined pointwise and simultaneous thresholds, with a comparison of theoretical thresholds and empirical 95th percentiles. |
 
 ## Layout
 
@@ -22,12 +22,12 @@ bigf/                 shared Python modules
   plotting.py         figure styles and saving
   paths.py            output locations
 scripts/
-  run_fixed_input.py  runs the Monte Carlo experiment behind Table 1 and Figure 5
+  run_fixed_input.py  runs the Monte Carlo experiment behind Table 1 and Figure 6
   sync_to_paper.sh    copies the manuscript's figures into the paper folder
 tests/                tests of the modules and of the committed results
 01–03 notebooks       build the figures and Table 1
-figs/                 figures and the data plotted in Figures 3 and 4
-results/              Monte Carlo results, Table 1, and the data for Figure 5
+figs/                 figures and the data plotted in Figures 4 and 5
+results/              Monte Carlo results, Table 1, and the data for Figure 6
 ```
 
 The notebooks hold the settings and the plotting code for each figure. The formulas and the simulation are in `bigf/`, so every notebook and script uses the same implementation. A new experiment adds a module in `bigf/`, a script in `scripts/`, a folder in `results/`, and a notebook.
@@ -68,7 +68,7 @@ The script writes these files to `results/fixed_input/`:
 - `diagnostics.json`: checks of the sampling construction.
 - `run_info.json`: the settings and the Python, NumPy, and SciPy versions of the run.
 
-The values in the manuscript's Table 1 and Figure 5 come from the committed files. Running the script again overwrites them. A new run uses the same design and seed, but it can give slightly different Monte Carlo values in a different numerical environment, for example with a different NumPy, SciPy, or BLAS build. To rebuild `calibration_records.json` from the committed errors without sampling, run:
+The values in the manuscript's Table 1 and Figure 6 come from the committed files. Running the script again overwrites them. A new run uses the same design and seed, but it can give slightly different Monte Carlo values in a different numerical environment, for example with a different NumPy, SciPy, or BLAS build. To rebuild `calibration_records.json` from the committed errors without sampling, run:
 
 ```bash
 python scripts/run_fixed_input.py --summarize
@@ -101,5 +101,5 @@ The committed figures and results were generated in this environment. `results/f
 
 ## Generated files
 
-- `figs/`: Figures 2–5 in PDF and PNG format, plus the data for Figures 3 and 4 in CSV format. The PDFs carry no creation date, so an unchanged plot gives an unchanged file.
-- `results/fixed_input/`: the Monte Carlo results listed above, Table 1 in LaTeX and CSV format, and the data for Figure 5.
+- `figs/`: Figures 3–6 in PDF and PNG format, plus the data for Figures 4 and 5 in CSV format. The PDFs carry no creation date, so an unchanged plot gives an unchanged file.
+- `results/fixed_input/`: the Monte Carlo results listed above, Table 1 in LaTeX and CSV format, and the data for Figure 6.
