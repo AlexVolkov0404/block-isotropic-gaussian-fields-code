@@ -44,7 +44,7 @@ def record_key(row):
     return row["profile"], row["dimension"], row["radius"], row["p"], row["scheme"]
 
 
-def test_figure4_data():
+def test_probability_bounds_data():
     rows = read_csv(FIG_DIR / "probability_bounds_data.csv")
     by_name = {(p.family, p.shape): p for p in profiles.manuscript_profiles().values()}
     for row in rows[:: max(1, len(rows) // 600)]:
@@ -68,7 +68,7 @@ def test_figure4_data():
         )
 
 
-def test_figure5_data():
+def test_radius_dimension_data():
     rows = read_csv(FIG_DIR / "radius_dimension_data.csv")
     assert rows
     for row in rows:
@@ -147,9 +147,9 @@ def test_table1_matches_records(records):
         assert " & ".join(row[column] for column in columns) in tex
 
 
-def test_figure6_data_matches_records(records):
+def test_calibration_p95_data_matches_records(records):
     by_key = {record_key(row): row for row in records}
-    rows = read_csv(RESULTS_DIR / "figure6_calibration_p95.csv")
+    rows = read_csv(RESULTS_DIR / "calibration_p95_data.csv")
     assert len(rows) == 2 * len(CONFIG.radii)
     for row in rows:
         source = by_key[

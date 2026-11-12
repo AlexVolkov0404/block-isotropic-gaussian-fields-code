@@ -1,4 +1,4 @@
-"""Fixed-input Monte Carlo experiment (Table 1 and Figure 6 of the manuscript).
+"""Fixed-input Monte Carlo experiment (Table 1 and Figure 5 of the manuscript).
 
 For each profile, block dimension D and radius R, the experiment samples
 independent fields and records the absolute error at the fixed pair
